@@ -7,7 +7,7 @@ from io import BytesIO
 import os
 
 # Set up the OpenAI client with the API key
-client = OpenAI(api_key= st.secrets["OPENAI_API_KEY"])
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 gcreds = st.secrets["gcp_service_account"]
 credentials = service_account.Credentials.from_service_account_info(gcreds)
 speech_client = speech.SpeechClient(credentials=credentials)
@@ -76,6 +76,24 @@ else:
     st.sidebar.header("Settings")
     output_format = st.sidebar.selectbox("Output Format", ["text", "json"])
     
+    # Language selection
+    language_options = {
+        "English (US)": "en-US",
+        "Spanish (Spain)": "es-ES",
+        "French (France)": "fr-FR",
+        "German (Germany)": "de-DE",
+        "Chinese (Mandarin)": "zh",
+        "Arabic (Modern Standard)": "ar-SA",
+        "Arabic (Saudi)": "ar-SA",
+    }
+
+    language_code = st.sidebar.selectbox(
+        "Choose Language:",
+        options=list(language_options.keys()),
+        index=0  # Default to English (US)
+    )
+    selected_language_code = language_options[language_code]
+
     # Google Cloud Storage bucket name
     bucket_name = "your-bucket-name"
 
@@ -182,7 +200,7 @@ if transcribe_button and audio_file:
                 config = speech.RecognitionConfig(
                     encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
                     sample_rate_hertz=16000,
-                    language_code="en-US",
+                    language_code=selected_language_code,
                 )
                 operation = speech_client.long_running_recognize(config=config, audio=audio)
                 response = operation.result(timeout=300)
@@ -193,7 +211,7 @@ if transcribe_button and audio_file:
                 config = speech.RecognitionConfig(
                     encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
                     sample_rate_hertz=16000,
-                    language_code="en-US",
+                    language_code=selected_language_code,
                 )
                 response = speech_client.recognize(config=config, audio=audio)
 
