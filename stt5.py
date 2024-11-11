@@ -83,7 +83,6 @@ else:
         "French (France)": "fr-FR",
         "German (Germany)": "de-DE",
         "Chinese (Mandarin)": "zh",
-        "Arabic (Modern Standard)": "ar-SA",
         "Arabic (Saudi)": "ar-SA",
     }
 
