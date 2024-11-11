@@ -7,10 +7,10 @@ from io import BytesIO
 import os
 
 # Set up the OpenAI client with the API key
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
+client = OpenAI(api_key= st.secrets["OPENAI_API_KEY"])
+gcreds = st.secrets["gcp_service_account"]
 # Initialize Google Cloud clients
-credentials = service_account.Credentials.from_service_account_file("speech-to-text-cloud-key.json")
+credentials = service_account.Credentials.from_service_account_file(gcreds)
 speech_client = speech.SpeechClient(credentials=credentials)
 storage_client = storage.Client(credentials=credentials)
 
