@@ -9,8 +9,7 @@ import os
 # Set up the OpenAI client with the API key
 client = OpenAI(api_key= st.secrets["OPENAI_API_KEY"])
 gcreds = st.secrets["gcp_service_account"]
-# Initialize Google Cloud clients
-credentials = service_account.Credentials.from_service_account_file(gcreds)
+credentials = service_account.Credentials.from_service_account_info(gcreds)
 speech_client = speech.SpeechClient(credentials=credentials)
 storage_client = storage.Client(credentials=credentials)
 
