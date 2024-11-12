@@ -124,12 +124,12 @@ elif transcription_service == "Lemonfox Whisperv3":
         st.session_state.lemonfox_saved_prompt = ""
     
     lemonfox_prompt = st.text_area("Enter a prompt to guide the Lemonfox transcription (optional):")
-    submit_lemonfox_prompt = st.button("Submit Lemonfox Prompt")
+    submit_lemonfox_prompt = st.button("Submit Prompt")
 
     # Save the prompt when "Submit Lemonfox Prompt" is clicked
     if submit_lemonfox_prompt:
         st.session_state.lemonfox_saved_prompt = lemonfox_prompt
-        st.success("Lemonfox prompt saved successfully!")
+        st.success("Prompt saved successfully!")
 
 # Common audio input section
 option = st.selectbox("Choose an option:", ("Record Audio", "Upload Audio"))
