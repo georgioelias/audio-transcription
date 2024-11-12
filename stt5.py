@@ -5,6 +5,7 @@ from google.oauth2 import service_account
 from pydub import AudioSegment
 from io import BytesIO
 import os
+import requests
 
 # Set up the OpenAI client with the API key
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -18,7 +19,7 @@ st.title("Audio Transcription App")
 # Service selection
 transcription_service = st.radio(
     "Choose Transcription Service:",
-    ("OpenAI Whisper", "Google Cloud Speech-to-Text")
+    ("OpenAI Whisper", "Google Cloud Speech-to-Text", "Lemonfox Whisperv3")
 )
 
 if transcription_service == "OpenAI Whisper":
@@ -68,7 +69,7 @@ if transcription_service == "OpenAI Whisper":
         st.session_state.saved_prompt = limit_prompt(prompt_text)
         st.success("Prompt saved successfully!")
 
-else:
+elif transcription_service == "Google Cloud Speech-to-Text":
     # Google Cloud Speech-to-Text UI
     st.title("Google Cloud Speech-to-Text")
     
@@ -85,7 +86,6 @@ else:
         "Chinese (Mandarin)": "zh",
         "Arabic (Saudi)": "ar-SA",
     }
-
     language_code = st.sidebar.selectbox(
         "Choose Language:",
         options=list(language_options.keys()),
@@ -95,6 +95,41 @@ else:
 
     # Google Cloud Storage bucket name
     bucket_name = "your-bucket-name"
+
+elif transcription_service == "Lemonfox Whisperv3":
+    # Lemonfox Whisperv3 Transcription UI
+    st.title("Lemonfox Whisperv3 Transcription")
+    
+    # Sidebar settings for Lemonfox Whisperv3
+    st.sidebar.header("Lemonfox Settings")
+    output_format = st.sidebar.selectbox("Output Format", ["text", "json"])
+    
+    # Language selection
+    language_options = {
+        "Auto-Detect" : " ",
+        "English": "english",
+        "Spanish": "spanish",
+        "French": "french",
+        "Arabic": "arabic",
+    }
+    language_code = st.sidebar.selectbox(
+        "Choose Language:",
+        options=list(language_options.keys()),
+        index=0
+    )
+    selected_language_code = language_options[language_code]
+
+    # Prompt input and submit button for Lemonfox
+    if "lemonfox_saved_prompt" not in st.session_state:
+        st.session_state.lemonfox_saved_prompt = ""
+    
+    lemonfox_prompt = st.text_area("Enter a prompt to guide the Lemonfox transcription (optional):")
+    submit_lemonfox_prompt = st.button("Submit Lemonfox Prompt")
+
+    # Save the prompt when "Submit Lemonfox Prompt" is clicked
+    if submit_lemonfox_prompt:
+        st.session_state.lemonfox_saved_prompt = lemonfox_prompt
+        st.success("Lemonfox prompt saved successfully!")
 
 # Common audio input section
 option = st.selectbox("Choose an option:", ("Record Audio", "Upload Audio"))
@@ -137,64 +172,40 @@ transcribe_button = st.button("Transcribe", key="transcribe_button")
 if transcribe_button and audio_file:
     try:
         if transcription_service == "OpenAI Whisper":
-            # Read the uploaded file and prepare it for transcription
+            # OpenAI Whisper Transcription logic
             audio_bytes = audio_file.read()
-            
-            # Convert .ogg or .opus to .wav if necessary
-            if audio_file.type in ["audio/ogg", "audio/opus"]:
-                audio_segment = AudioSegment.from_file(BytesIO(audio_bytes), format="ogg" if audio_file.type == "audio/ogg" else "opus")
-                audio_data = BytesIO()
-                audio_segment.export(audio_data, format="wav")
-                audio_data.name = audio_file.name.replace(".ogg", ".wav").replace(".opus", ".wav")
-            else:
-                audio_data = BytesIO(audio_bytes)
-                audio_data.name = audio_file.name
+            audio_data = BytesIO(audio_bytes)
+            audio_data.name = audio_file.name
 
-            # Define granularity for JSON output
-            granularity_options = {
+            timestamp_options = {
                 "none": None,
                 "segment": ["segment"],
                 "word": ["word"],
                 "both": ["segment", "word"]
             }
-            timestamp_options = granularity_options[timestamp_granularity]
-
-            # Transcribe audio using the client object
             transcription = client.audio.transcriptions.create(
                 model=model,
                 file=audio_data,
                 prompt=st.session_state.saved_prompt or "",
                 response_format="verbose_json" if output_format == "json" else "text",
                 temperature=temperature,
-                timestamp_granularities=timestamp_options if timestamp_options else None
+                timestamp_granularities=timestamp_options.get(timestamp_granularity)
             )
-            
-            # Display the transcription result based on the output format
+
+            st.success("Transcription completed!")
             if output_format == "text":
                 st.write("Transcription:")
                 st.write(transcription)
             elif output_format == "json":
-                st.write("Transcription JSON:")
                 st.json(transcription)
 
-                # Display word-level timestamps if available
-                if timestamp_granularity in ["word", "both"] and hasattr(transcription, "words"):
-                    st.write("Word-Level Timestamps:")
-                    for word_info in transcription.words:
-                        st.write(word_info)
-
-        else:
-            # Google Cloud Speech-to-Text transcription
+        elif transcription_service == "Google Cloud Speech-to-Text":
+            # Google Cloud Speech-to-Text Transcription logic
             wav_file = convert_to_wav(audio_file)
             audio_size_mb = len(wav_file.getbuffer()) / (1024 * 1024)
 
             if audio_size_mb > 10:
-                st.info("Uploading file to Google Cloud Storage for asynchronous transcription...")
                 uri = upload_to_gcs(bucket_name, audio_file.name, wav_file)
-                st.success("File uploaded successfully!")
-
-                # Run asynchronous transcription
-                st.info("Transcribing asynchronously...")
                 audio = speech.RecognitionAudio(uri=uri)
                 config = speech.RecognitionConfig(
                     encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
@@ -204,8 +215,6 @@ if transcribe_button and audio_file:
                 operation = speech_client.long_running_recognize(config=config, audio=audio)
                 response = operation.result(timeout=300)
             else:
-                # Run synchronous transcription
-                st.info("Transcribing synchronously...")
                 audio = speech.RecognitionAudio(content=wav_file.read())
                 config = speech.RecognitionConfig(
                     encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
@@ -214,18 +223,48 @@ if transcribe_button and audio_file:
                 )
                 response = speech_client.recognize(config=config, audio=audio)
 
-            # Display transcription
             st.success("Transcription completed!")
             if output_format == "text":
                 st.write("Transcription:")
-                st.write("\n".join(result.alternatives[0].transcript for result in response.results))
+                for result in response.results:
+                    st.write(result.alternatives[0].transcript)
             elif output_format == "json":
                 st.json([{
                     "transcript": result.alternatives[0].transcript,
                     "confidence": result.alternatives[0].confidence
                 } for result in response.results])
 
+        elif transcription_service == "Lemonfox Whisperv3":
+            # Lemonfox Whisperv3 Transcription logic
+            wav_file = convert_to_wav(audio_file)
+            files = {"file": wav_file}
+            data = {
+                "language": selected_language_code,
+                "response_format": output_format,
+                "prompt": st.session_state.lemonfox_saved_prompt  # Use the saved prompt
+            }
+            headers = {
+                "Authorization": st.secrets["LEMONFOX_API_KEY"]
+            }
+            response = requests.post("https://api.lemonfox.ai/v1/audio/transcriptions", headers=headers, files=files, data=data)
+            
+            if response.status_code == 200:
+                try:
+                    transcription_result = response.json()
+                except ValueError:
+                    transcription_result = response.text
+
+                st.success("Transcription completed!")
+                if output_format == "text":
+                    st.write("Transcription:")
+                    st.write(transcription_result.get("transcription", transcription_result) if isinstance(transcription_result, dict) else transcription_result)
+                elif output_format == "json":
+                    st.json(transcription_result)
+            else:
+                st.error(f"Transcription failed: {response.text}")
+
     except Exception as e:
         st.error(f"Error in transcription: {e}")
+
 elif transcribe_button and not audio_file:
     st.warning("Please upload or record an audio file to transcribe.")
