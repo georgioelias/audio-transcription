@@ -16,6 +16,12 @@ speech_client = speech.SpeechClient(credentials=credentials)
 storage_client = storage.Client(credentials=credentials)
 aai.settings.api_key = st.secrets["ASSEMBLYAI_API_KEY"]
 lemonfox_apikey= st.secrets["LEMONFOX_API_KEY"]
+
+st.set_page_config(
+    page_title="Audio Transcription App",  
+    page_icon="🎤"                  
+)
+
 st.title("Audio Transcription App")
 
 # Service selection
